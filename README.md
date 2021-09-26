@@ -26,3 +26,6 @@ Or you can place it anywhere you want and change the weight path in `colorizers/
 ```
 python demo_release.py
 ```
+
+
+**Please check tarin branch for training**
