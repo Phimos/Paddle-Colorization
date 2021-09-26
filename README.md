@@ -14,12 +14,14 @@ _Use PaddlePaddle to implementate Colorful Image Colorization_
 - [PyTorch](https://github.com/richzhang/colorization)
 
 ## Usage
+This is the training branch for Colorful Image Colorization, please check main branch for inference.
 
+Only support training ECCV16 currently
 ### Download PaddlePaddle Weight
 
 Download weight from [Google Drive](https://drive.google.com/drive/folders/1hRUbrlUkO5zXzi_6h2ntA6zR_1Uw2xUq?usp=sharing), and place it under `modle/pretrain/`.
 
-Or you can place it anywhere you want and change the weight path in `colorizers/eccv16.py` and `colorizers/siggraph17.py`.
+Or you can place it anywhere you want and change the weight path in `colorizers/eccv16.py` 
 
 ### Run
 
