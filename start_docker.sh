@@ -1,0 +1,2 @@
+docker run -it --gpus all --shm-size 50G -v /data1/wangbingxuan/imagenet:/data -v ~/paddle:/code 04ecfc079715
+docker run -it --gpus all --ipc=host -v /data1/wangbingxuan/imagenet:/data -v ~/paddle:/code 04ecfc079715

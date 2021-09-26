@@ -17,12 +17,21 @@ _Use PaddlePaddle to implementate Colorful Image Colorization_
 
 ### Download PaddlePaddle Weight
 
-Download weight from [Google Drive](https://drive.google.com/drive/folders/1hRUbrlUkO5zXzi_6h2ntA6zR_1Uw2xUq?usp=sharing), and place it in this folder.
+Download weight from [Google Drive](https://drive.google.com/drive/folders/1hRUbrlUkO5zXzi_6h2ntA6zR_1Uw2xUq?usp=sharing), and place it under `modle/pretrain/`.
 
 Or you can place it anywhere you want and change the weight path in `colorizers/eccv16.py` and `colorizers/siggraph17.py`.
 
 ### Run
 
+Training script:
+
 ```
-python demo_release.py
+python train.py -bs 40 --use_gpu  
 ```
+
+Evaluation script:
+
+```
+python train.py --use_gpu -e 0 --pretrain
+```
+ Please check main branch for inference

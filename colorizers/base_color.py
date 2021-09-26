@@ -1,6 +1,8 @@
 import paddle
 import paddle.nn as nn
+import paddle.nn.initializer#\
 
+#nn.Conv1D.weight
 
 class BaseColor(nn.Layer):
     def __init__(self):

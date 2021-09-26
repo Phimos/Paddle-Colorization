@@ -1,12 +1,18 @@
 import numpy as np
+from numpy.lib.function_base import place
 import paddle
+from paddle import device
+import paddle.fluid as fluid
+import time
+from paddle.framework import dtype
 import paddle.nn as nn
-
+import os
 from .base_color import *
-
+from utils.trainable_layers import NNEncLayer,  Rebalance_Op
+import pdb
 
 class ECCVGenerator(BaseColor):
-    def __init__(self, norm_layer=nn.BatchNorm2D):
+    def __init__(self, norm_layer=nn.BatchNorm2D, pretrain_path = "model/pretrain"):
         super(ECCVGenerator, self).__init__()
 
         model1 = [
@@ -182,27 +188,72 @@ class ECCVGenerator(BaseColor):
         self.model8 = nn.Sequential(*model8)
 
         self.softmax = nn.Softmax(axis=1)
-        self.model_out = nn.Conv2D(
-            313, 2, kernel_size=1, padding=0, dilation=1, stride=1, bias_attr=False
-        )
         self.upsample4 = nn.Upsample(scale_factor=4, mode="bilinear")
+        self.rebalance_factor = np.load(os.path.join(pretrain_path,"prior_probs.npy"))
+        # rebalance_factor (313, )
+        self.points = np.load(os.path.join(pretrain_path,"pts_in_hull.npy"))
+        self.points = paddle.to_tensor(self.points, dtype=paddle.float32)/110.0
+        # points (313,2)
+        self.rebalance_factor = paddle.to_tensor(self.rebalance_factor, dtype=paddle.float32)
+        self.gt_encoder = NNEncLayer(self.points)
+        self.model_out = nn.Conv2D(
+            313, 2, kernel_size=1, padding=0, dilation=1, stride=1, 
+            bias_attr=False, 
+            #weight_attr=nn.initializer.Assign(paddle.reshape(self.points,(313,2,1,1))
+        )
+        self.pool = nn.AvgPool2D(4,4)
+        self.channel_size = 313
 
-    def forward(self, input_l):
-        conv1_2 = self.model1(self.normalize_l(input_l))
-        conv2_2 = self.model2(conv1_2)
-        conv3_3 = self.model3(conv2_2)
-        conv4_3 = self.model4(conv3_3)
-        conv5_3 = self.model5(conv4_3)
-        conv6_3 = self.model6(conv5_3)
-        conv7_3 = self.model7(conv6_3)
-        conv8_3 = self.model8(conv7_3)
-        out_reg = self.model_out(self.softmax(conv8_3))
-
-        return self.unnormalize_ab(self.upsample4(out_reg))
+    def forward(self, input_l, target, if_train = True):
+        #print(input_l.shape)
+        #times = []
+        #times.append(time.time())
+        gen = self.model1(self.normalize_l(input_l))
+        gen = self.model2(gen)
+        gen = self.model3(gen)
+        gen = self.model4(gen)
+        gen = self.model5(gen)
+        gen = self.model6(gen)
+        gen = self.model7(gen)
+        gen = self.model8(gen)  #B*313*H/4*W/4
+        #times.append(time.time())
+        #print(f"model time: {#times[-1]-#times[-2]}")
+        #print(gen.shape)
+        #gen = self.softmax(gen)
+        #print(input_lab.shape)       
+        #print(input_ab.shape)
+        b,c,h,w = gen.shape
+        if(if_train):
+            target = self.pool(self.normalize_ab(target))
+            ##pdb.set_trace()
+            #b,c,h,w = target.shape
+            #print(target.shape, gen.shape)
+            #assert target.shape == gen.shape
+            
+            # target 先argmax再one_hot再乘上rebalance，得到参数，再乘上target，就是用于计算loss的target
+            #pdb.set_trace()
+            target = self.gt_encoder(target)
+            weight = paddle.argmax(target,axis=-1)
+            weight = nn.functional.one_hot(weight,self.channel_size)
+            weight = paddle.matmul(weight, self.rebalance_factor.unsqueeze(1))
+            #target = Rebalance_Op.apply(target,weight)
+            gen_reshape = paddle.reshape(paddle.transpose(gen,(0,2,3,1)),(-1,313))
+            # B*H*W,313
+            gen_reshape = Rebalance_Op.apply(gen_reshape, weight)
+        else:
+            # gen_reshape = paddle.reshape(paddle.transpose(gen,(0,2,3,1)),(-1,313))
+            # gen_reshape = paddle.matmul(gen_reshape,self.points)
+            # gen_reshape = paddle.transpose(paddle.reshape(gen_reshape,(b, gen.shape[-2], gen.shape[-1],2)),(0,3,1,2))
+            gen_reshape = self.unnormalize_ab(self.upsample4(self.model_out(self.softmax(gen))))
+            #gen_reshape = self.unnormalize_ab(gen_reshape)
+            #target = None
+        #pdb.set_trace()
+        return gen_reshape, target
 
 
 def eccv16(pretrained=True):
     model = ECCVGenerator()
     if pretrained:
-        model.set_state_dict(paddle.load("paddle_eccv16.pdparams"))
+        model.set_state_dict(paddle.load("model/pretrain/paddle_eccv16.pdparams"))
+        print("Successfully add model pretrained parameters!")
     return model
